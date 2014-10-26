@@ -1,13 +1,11 @@
-defmodule Utils do
+defmodule Ormex.Utils do
     
     
     defp escape(data) when is_binary(data), do: data |> String.to_char_list |> escape([])
-    defp escape([], res), do: res |> List.to_string
+    defp escape([], res), do: res |> Enum.reverse |> List.to_string
     defp escape([char|tail], res) do
-        IO.puts char
         case char do
             '\\' -> escape(tail, ['\\\\' | res])
-            #'\'' -> escape(tail, ['\\\'' | res])
             39   -> escape(tail, ['\\\'' | res])
             '"' -> escape(tail,  ['\\"' | res])
             '\n' -> escape(tail, ['\\\\n' | res])
@@ -17,6 +15,7 @@ defmodule Utils do
     end
 
 
+    defp query_val(nil), do: "NULL"
     defp query_val(k) when is_binary(k), do: "'#{escape(k)}'"
     defp query_val(k) when is_integer(k), do: "#{k}"
     defp query_val(k) when is_float(k), do: "#{k}"
@@ -51,5 +50,33 @@ defmodule Utils do
     defp query([{key, operator, val}|tail], res) do
         query(tail, ["#{key} #{operator} #{val}" | res]) 
     end
+
+    def create_field(f = %{column: column, datatype: dt, opts: opts}) do
+        "#{column} " <> 
+            case dt do
+                :int   ->  "INT"
+                :text  ->  "TEXT"
+                :char  ->  "VARCHAR(#{Dict.get(opts, :maxlength, 100)})"
+                :bool  ->  "BOOLEAN"
+                :float ->  "FLOAT"
+            end <>
+            case Dict.has_key?(opts, :default) do
+                false -> ""
+                true -> " DEFAULT " <> query_val(Dict.get(opts, :default))
+            end
+    end
+
+    def create_fields(fields) do
+        Enum.map(fields, &create_field/1) |> Enum.join ", "
+    end
+
+    def get_name(name) when is_atom(name), do: name |> Atom.to_string |> get_name
+    def get_name(name) do
+        case name do
+            "Elixir." <> sname -> sname
+            sname -> sname
+        end
+    end
+
 
 end
